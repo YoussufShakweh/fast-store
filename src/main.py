@@ -1,13 +1,12 @@
 from fastapi import FastAPI
 
-from .core.config import settings
+from src.api.routes.user import router as user_router
+from src.core.config import settings
+
 
 app = FastAPI(
     debug=settings.DEBUG,
     root_path=settings.API_V1_STR,
 )
 
-
-@app.get("/hello-world")
-def hello_world():
-    return {"msg": "Hello, World!"}
+app.include_router(user_router)
