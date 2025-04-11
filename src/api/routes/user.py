@@ -13,7 +13,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 @router.get("/", response_model=UserList)
 async def read_users(
     db: AsyncSessionDep,
-    email: str | None = None,
+    q: str | None = None,
     is_active: bool | None = None,
     is_superuser: bool | None = None,
     skip: int = 0,
@@ -21,8 +21,8 @@ async def read_users(
 ):
     conditions = []
 
-    if email:
-        conditions.append(User.email.icontains(email))
+    if q:
+        conditions.append(User.email.icontains(q))
 
     if is_active is not None:
         conditions.append(User.is_active == is_active)
@@ -37,11 +37,8 @@ async def read_users(
         count_stmt = count_stmt.where(*conditions)
         stmt = stmt.where(*conditions)
 
-    count_result = await db.execute(count_stmt)
-    users_result = await db.execute(stmt)
-
-    count = count_result.scalar_one()
-    users = users_result.scalars().all()
+    count = (await db.execute(count_stmt)).scalar_one()
+    users = (await db.execute(stmt)).scalars().all()
 
     return UserList(count=count, data=users)
 
