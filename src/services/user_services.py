@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from sqlalchemy import select, update
 
-from src.core.security import get_password_hash
+from src.core.security import get_password_hash, verify_password
 from src.deps import AsyncSessionDep
 from src.models.user import User
 from src.schemas.user import UserCreate, UserUpdate
@@ -25,27 +25,40 @@ async def get_user_by_email(*, db: AsyncSessionDep, email: str) -> User | None:
 
 
 async def update_user(
-    *, db: AsyncSessionDep, user: User, user_update: UserUpdate
+    *, db: AsyncSessionDep, db_user: User, user_update: UserUpdate
 ) -> User:
     user_data = user_update.model_dump(exclude_unset=True)
-    stmt = update(User).where(User.id == user.id).values(**user_data)
+    stmt = update(User).where(User.id == db_user.id).values(**user_data)
     await db.execute(stmt)
     await db.commit()
-    await db.refresh(user)
-    return user
+    return db_user
 
 
-async def delete_user(*, db: AsyncSessionDep, user: User) -> None:
-    await db.delete(user)
+async def delete_user(*, db: AsyncSessionDep, db_user: User) -> None:
+    await db.delete(db_user)
     await db.commit()
 
 
-async def update_last_login(*, db: AsyncSessionDep, user: User) -> User:
+async def update_last_login(*, db: AsyncSessionDep, db_user: User) -> User:
     stmt = (
         update(User)
-        .where(User.id == user.id)
+        .where(User.id == db_user.id)
         .values(last_login=datetime.now(timezone.utc))
     )
     await db.execute(stmt)
     await db.commit()
-    return user
+    return db_user
+
+
+async def authenticate(
+    *, db: AsyncSessionDep, email: str, password: str
+) -> User | None:
+    db_user = await get_user_by_email(db=db, email=email)
+    if not db_user:
+        return None
+    if not verify_password(password, db_user.hashed_password):
+        return None
+
+    await update_last_login(db=db, db_user=db_user)
+
+    return db_user

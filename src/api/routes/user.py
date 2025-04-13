@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import func, select
 
-from src.deps import AsyncSessionDep, GetUserOr404
+from src.deps import AsyncSessionDep, CurrentUser, GetUserOr404
 from src.models.user import User
 from src.schemas.user import UserCreate, UserDetail, UserList, UserUpdate
 from src.services import user_services
@@ -51,6 +51,27 @@ async def create_user(form_data: UserCreate, db: AsyncSessionDep):
     return await user_services.create_user(db=db, user_in=form_data)
 
 
+@router.get("/me", response_model=UserDetail)
+async def read_user_me(current_user: CurrentUser):
+    return current_user
+
+
+@router.patch("/me", response_model=UserDetail)
+async def update_user_me(
+    current_user: CurrentUser, form_data: UserUpdate, db: AsyncSessionDep
+):
+    if form_data.email and form_data.email != current_user.email:
+        existing_email = await user_services.get_user_by_email(
+            db=db, email=form_data.email
+        )
+        if existing_email:
+            raise HTTPException(status_code=400, detail="Email already registered")
+    current_user = await user_services.update_user(
+        db=db, db_user=current_user, user_update=form_data
+    )
+    return current_user
+
+
 @router.get("/{user_id}", response_model=UserDetail)
 async def read_user(user: GetUserOr404):
     return user
@@ -64,11 +85,11 @@ async def update_user(user: GetUserOr404, form_data: UserUpdate, db: AsyncSessio
         )
         if existing_email:
             raise HTTPException(status_code=400, detail="Email already registered")
-    user = await user_services.update_user(db=db, user=user, user_update=form_data)
+    user = await user_services.update_user(db=db, db_user=user, user_update=form_data)
     return user
 
 
 @router.delete("/{user_id}", status_code=204)
 async def delete_user(user: GetUserOr404, db: AsyncSessionDep):
-    await user_services.delete_user(db=db, user=user)
+    await user_services.delete_user(db=db, db_user=user)
     return Response(status_code=204)
