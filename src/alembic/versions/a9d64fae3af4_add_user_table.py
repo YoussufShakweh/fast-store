@@ -6,13 +6,13 @@ Create Date: 2025-04-09 12:29:43.888248
 
 """
 
+from datetime import datetime, timezone
 from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from src.db.utils import UTC_NOW
 
 # revision identifiers, used by Alembic.
 revision: str = "a9d64fae3af4"
@@ -41,14 +41,14 @@ def upgrade() -> None:
             "created_at",
             sa.DateTime(),
             nullable=False,
-            server_default=UTC_NOW,
+            server_default=sa.func.now(),
         ),
         sa.Column(
             "updated_at",
             sa.DateTime(),
             nullable=False,
-            server_default=UTC_NOW,
-            server_onupdate=UTC_NOW,
+            server_default=sa.func.now(),
+            onupdate=datetime.now(timezone.utc),
         ),
     )
 
